@@ -9,19 +9,38 @@ import { api } from "~/utils/api"
 import type { RouterOutputs } from "~/utils/api"
 import Image from "next/image"
 import { LoadingPage, LoadingSpinner } from "~/components/loading"
+import { useState } from "react"
 
 dayjs.extend(relativeTime)
 
 const CreatePostWizard = () => {
     const { user, isLoaded: userLoaded } = useUser()
-    // console.log(user)
+
+    const [input, setInput] = useState('')
+
+    const ctx = api.useContext()
+
+    const { mutate, isLoading: isPosting } = api.posts.create.useMutation({
+        onSuccess: () => {
+            setInput('')
+            void ctx.posts.getAll.invalidate()
+        }
+    })
 
     if (!user) return null
 
     return <div className="flex gap-4 w-full">
         {/* <UserButton /> */}
         <Image width={56} height={56} src={user.profileImageUrl} alt="" className="w-14 h-14 rounded-full" />
-        <input type="text" placeholder="Type some emojis" className="bg-transparent grow outline-none" />
+        <input
+            type="text"
+            placeholder="Type some emojis"
+            className="bg-transparent grow outline-none"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isPosting}
+        />
+        <button onClick={() => mutate({ content: input })}>Post</button>
     </div>
 }
 
@@ -37,7 +56,7 @@ const PostView = (props: PostWithUser) => {
                     <span>{`@${author.username}`}</span>
                     <span className="font-thin">{` • ${dayjs(post.createdAt).fromNow()}`}</span>
                 </div>
-                <span>{post.content}</span>
+                <span className="text-2xl">{post.content}</span>
             </div>
         </div>
     )
