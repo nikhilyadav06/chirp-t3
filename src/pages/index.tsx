@@ -96,6 +96,11 @@ const Home: NextPage = () => {
                     <SignInButton />
                 </div>}
                 {isSignedIn && <CreatePostWizard />}
+                {isSignedIn && (
+                    <div className="absolute bottom-0 right-0 p-4">
+                        <UserButton />
+                    </div>
+                )}
             </div>
 
             <Feed />
