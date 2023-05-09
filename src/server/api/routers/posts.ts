@@ -7,6 +7,7 @@ import { createTRPCRouter, privateProcedure, publicProcedure } from "~/server/ap
 import { Ratelimit } from "@upstash/ratelimit"; // for deno: see above
 import { Redis } from "@upstash/redis";
 import { filterUserForClient } from "~/server/helpers/filterUserForClient";
+import { Post } from "@prisma/client";
 
 // Create a new ratelimiter, that allows 3 requests per 1 minute
 const ratelimit = new Ratelimit({
@@ -21,6 +22,25 @@ const ratelimit = new Ratelimit({
   prefix: "@upstash/ratelimit",
 });
 
+const addUserDataToPosts = async (posts: Post[]) => {
+    const users = (await clerkClient.users.getUserList({
+        userId: posts.map(post => post.authorId)
+    })).map(filterUserForClient)
+
+    return posts.map(post => {
+        const author = users.find(user => user.id === post.authorId)
+
+        if (!author) throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Author not found for post"
+        })
+        return {
+            post,
+            author
+        }
+    })
+}
+
 export const postsRouter = createTRPCRouter({
     getAll: publicProcedure.query(async ({ ctx }) => {
         const posts = await ctx.prisma.post.findMany({
@@ -30,22 +50,21 @@ export const postsRouter = createTRPCRouter({
             ]
         })
 
-        const users = (await clerkClient.users.getUserList({
-            userId: posts.map(post => post.authorId)
-        })).map(filterUserForClient)
+        return await addUserDataToPosts(posts)
+    }),
 
-        return posts.map(post => {
-            const author = users.find(user => user.id === post.authorId)
-
-            if (!author) throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message: "Author not found for post"
+    getPostsByUserId: publicProcedure.input(z.object({
+        userId: z.string()
+    })).query(async ({ ctx, input }) => {
+            const posts = await ctx.prisma.post.findMany({
+                where: {
+                    authorId: input.userId
+                },
+                take: 100,
+                orderBy: [{ createdAt: 'desc' }]
             })
-            return {
-                post,
-                author
-            }
-        })
+
+            return await addUserDataToPosts(posts)
     }),
 
     create: privateProcedure.input(z.object({
