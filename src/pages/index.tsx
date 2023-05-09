@@ -8,11 +8,12 @@ import relativeTime from "dayjs/plugin/relativeTime"
 import { api } from "~/utils/api"
 import type { RouterOutputs } from "~/utils/api"
 import Image from "next/image"
+import { LoadingPage, LoadingSpinner } from "~/components/loading"
 
 dayjs.extend(relativeTime)
 
 const CreatePostWizard = () => {
-    const { user } = useUser()
+    const { user, isLoaded: userLoaded } = useUser()
     // console.log(user)
 
     if (!user) return null
@@ -42,14 +43,28 @@ const PostView = (props: PostWithUser) => {
     )
 }
 
-const Home: NextPage = () => {
-    const user = useUser()
-    
-    const { data, isLoading } = api.posts.getAll.useQuery()
+const Feed = () => {
+    const { data, isLoading: postLoading } = api.posts.getAll.useQuery()
 
-    if (isLoading) return <div>Loading...</div>
+    if (postLoading) return <LoadingPage />
 
     if (!data) return <div>Something went wrong</div>
+
+    return (
+        <div className="flex flex-col">
+            {data?.map((fullPost) => (
+                <PostView {...fullPost} key={fullPost.post.id} />
+            ))}
+        </div>
+    )
+}
+
+const Home: NextPage = () => {
+    const { isLoaded: userLoaded, isSignedIn } = useUser()
+
+    api.posts.getAll.useQuery()
+
+    if (!userLoaded) return <div />
 
     return (<>
         <Head>
@@ -61,16 +76,13 @@ const Home: NextPage = () => {
             <div className="w-full md:max-w-2xl border-x border-slate-600">
                 <div className="border-b border-slate-600 p-4 flex justify-between items-center">
                     {/* <p className="font-bold">CHIRP!</p> */}
-                    {!user.isSignedIn && <div className="bg-slate-600 py-2 px-4 rounded">
+                    {!isSignedIn && <div className="bg-slate-600 py-2 px-4 rounded">
                         <SignInButton />
                     </div>}
-                    {user.isSignedIn && <CreatePostWizard />}
+                    {isSignedIn && <CreatePostWizard />}
                 </div>
-                <div className="flex flex-col">
-                    {data?.map((fullPost) => (
-                        <PostView {...fullPost} key={fullPost.post.id} />
-                    ))}
-                </div>
+                
+                <Feed />
             </div>
         </main>
     </>)
